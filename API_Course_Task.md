@@ -292,55 +292,94 @@ stateDiagram-v2
 ---
 
 ### Пример анализа функции `add_reminder`
+Буду ориентироваться на принципы дисциплины программирования Эдсгера Дейкстры.
 
-##### Функция: Создание нового напоминания (`add_reminder`)
 - **Требование ТЗ**: Пользователь должен создавать напоминания с текстом и датой, с возможностью указать периодичность и прикрепить файлы..
 
 **Фрагмент кода**:
 
 ```python
+@bot.message_handler(commands=['add'])
 def add_reminder(message):
-    bot.send_message(message.chat.id, "What should I remind you about?")
-    bot.set_state(message.from_user.id, StatesGroup.reminder_creation_name, message.chat.id)
+  reply_markup = telebot.types.ReplyKeyboardMarkup(
+    resize_keyboard=True,
+    one_time_keyboard=False,
+  )
+  reply_markup.row(telebot.types.KeyboardButton(utils.keyboard_buttons['cancel']))
+  bot.send_message(
+    message.chat.id,
+    'What should I remind you about?',
+    reply_markup=reply_markup,
+  )
+  bot.set_state(
+    message.from_user.id,
+    StatesGroup.reminder_creation_name,
+    message.chat.id
+  )
 
 @bot.message_handler(state=StatesGroup.reminder_creation_name)
-def process_text(message):
-    if message.text == utils.keyboard_buttons['cancel']:
-        bot.delete_state(message.from_user.id, message.chat.id)
-        reply_markup = utils.get_main_keyboard()
-        bot.send_message(message.chat.id, 'Cancelled', reply_markup=reply_markup)
-        return
-    reply_markup = telebot.types.ReplyKeyboardMarkup(
-        resize_keyboard=True,
-        one_time_keyboard=False,
-    )
-    reply_markup.row(telebot.types.KeyboardButton(utils.keyboard_buttons['cancel']))
-    bot.send_message(
-        message.chat.id,
-        'Enter the date',
-        reply_markup=reply_markup,
-    )
-    bot.set_state(
-        message.from_user.id,
-        StatesGroup.reminder_creation_date,
-        message.chat.id
-    )
-    with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
-        data['reminder_creation_name'] = message.text.strip()
+def reminder_name(message):
+  if (message.text == utils.keyboard_buttons['cancel']):
+    bot.delete_state(message.from_user.id, message.chat.id)
+    reply_markup = utils.get_main_keyboard()
+    bot.send_message(message.chat.id, 'Cancelled', reply_markup=reply_markup)
+    return
+
+  reply_markup = telebot.types.ReplyKeyboardMarkup(
+    resize_keyboard=True,
+    one_time_keyboard=False,
+  )
+  reply_markup.row(telebot.types.KeyboardButton(utils.keyboard_buttons['cancel']))
+  bot.send_message(
+    message.chat.id,
+    'Enter the date',
+    reply_markup=reply_markup,
+  )
+  bot.set_state(
+    message.from_user.id,
+    StatesGroup.reminder_creation_date,
+    message.chat.id
+  )
+  with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+    data['reminder_creation_name'] = message.text.strip()
 
 @bot.message_handler(state=StatesGroup.reminder_creation_date)
-def process_date(message):
-    if message.text == utils.keyboard_buttons['cancel']:
-        bot.delete_state(message.from_user.id, message.chat.id)
-        reply_markup = utils.get_main_keyboard()
-        bot.send_message(message.chat.id, 'Cancelled', reply_markup=reply_markup)
-        return
-    date_string = message.text.strip().lower()
-    try:
-        date = dateparser.parse(date_string)
-    except:
-        bot.send_message(message.chat.id, 'I don\'t understand')
-        return
+def reminder_date(message):
+  if (message.text == utils.keyboard_buttons['cancel']):
+    bot.delete_state(message.from_user.id, message.chat.id)
+    reply_markup = utils.get_main_keyboard()
+    bot.send_message(message.chat.id, 'Cancelled', reply_markup=reply_markup)
+    return
+
+  date_string = message.text.strip().lower()
+
+  try:
+    date = dateparser.parse(date_string)
+  except:
+    bot.send_message(message.chat.id, 'I don\'t understand')
+    return
+
+  reply_markup = telebot.types.ReplyKeyboardMarkup(
+    resize_keyboard=True,
+    one_time_keyboard=False,
+  )
+  reply_markup.row(
+    telebot.types.KeyboardButton('Yes'),
+    telebot.types.KeyboardButton('No'),
+  )
+  reply_markup.row(telebot.types.KeyboardButton(utils.keyboard_buttons['cancel']))
+  bot.send_message(
+    message.chat.id,
+    'Should it be a periodic reminder?',
+    reply_markup=reply_markup,
+  )
+  bot.set_state(
+    message.from_user.id,
+    StatesGroup.reminder_creation_periodic_prompt,
+    message.chat.id
+  )
+  with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+    data['reminder_creation_date'] = date
 ```
 
 **Объяснение**:
@@ -358,7 +397,7 @@ def process_date(message):
   - Бот: "Enter the date".
   - Пользователь: "2025-05-19".
   - Бот: "Should it be a periodic reminder?".
-  - Пользователь: "Нет".
+  - Пользователь: "No".
   - Результат: Напоминание создано с текстом "Купить молоко" и датой 2025-05-19.
 - **Ошибка ввода даты**:
   - Пользователь: "через 2 дня".
