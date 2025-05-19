@@ -289,6 +289,88 @@ stateDiagram-v2
 | R10 | Управление вложениями                  | EditReminder → Start             | 10 | bot.py: callback_query()          |
 | R11 | Обработка ошибок                       | Any                              | 11 | bot.py: error_handler()           |
 
+---
+
+### Пример анализа функции `add_reminder`
+
+##### Функция: Создание нового напоминания (`add_reminder`)
+- **Требование ТЗ**: Пользователь должен создавать напоминания с текстом и датой, с возможностью указать периодичность и прикрепить файлы..
+
+**Фрагмент кода**:
+
+```python
+def add_reminder(message):
+    bot.send_message(message.chat.id, "What should I remind you about?")
+    bot.set_state(message.from_user.id, StatesGroup.reminder_creation_name, message.chat.id)
+
+@bot.message_handler(state=StatesGroup.reminder_creation_name)
+def process_text(message):
+    if message.text == utils.keyboard_buttons['cancel']:
+        bot.delete_state(message.from_user.id, message.chat.id)
+        reply_markup = utils.get_main_keyboard()
+        bot.send_message(message.chat.id, 'Cancelled', reply_markup=reply_markup)
+        return
+    reply_markup = telebot.types.ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        one_time_keyboard=False,
+    )
+    reply_markup.row(telebot.types.KeyboardButton(utils.keyboard_buttons['cancel']))
+    bot.send_message(
+        message.chat.id,
+        'Enter the date',
+        reply_markup=reply_markup,
+    )
+    bot.set_state(
+        message.from_user.id,
+        StatesGroup.reminder_creation_date,
+        message.chat.id
+    )
+    with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+        data['reminder_creation_name'] = message.text.strip()
+
+@bot.message_handler(state=StatesGroup.reminder_creation_date)
+def process_date(message):
+    if message.text == utils.keyboard_buttons['cancel']:
+        bot.delete_state(message.from_user.id, message.chat.id)
+        reply_markup = utils.get_main_keyboard()
+        bot.send_message(message.chat.id, 'Cancelled', reply_markup=reply_markup)
+        return
+    date_string = message.text.strip().lower()
+    try:
+        date = dateparser.parse(date_string)
+    except:
+        bot.send_message(message.chat.id, 'I don\'t understand')
+        return
+```
+
+**Объяснение**:
+- Функция `add_reminder` инициирует процесс создания напоминания, запрашивая текст у пользователя и устанавливая состояние `reminder_creation_name`.
+- `process_text` сохраняет введенный текст и переходит к следующему шагу — вводу даты, обеспечивая возможность отмены через кнопку "cancel".
+- `process_date` использует библиотеку `dateparser` для преобразования строки в объект даты. Если дата не распознана, пользователь получает сообщение "I don't understand" и может попробовать снова.
+- Использование состояний (`StatesGroup`) отражает структурированный подход, как рекомендует Дейкстра, разбивая сложный процесс на мелкие шаги.
+- Обработка ошибок (например, некорректный ввод даты) показывает заботу о корректности, что также соответствует идеям Дейкстры.
+
+**Рассмотрим пример выполнения**:
+- **Корректный ввод**:
+  - Пользователь отправляет `/add`.
+  - Бот: "What should I remind you about?".
+  - Пользователь: "Купить молоко".
+  - Бот: "Enter the date".
+  - Пользователь: "2025-05-19".
+  - Бот: "Should it be a periodic reminder?".
+  - Пользователь: "Нет".
+  - Результат: Напоминание создано с текстом "Купить молоко" и датой 2025-05-19.
+- **Ошибка ввода даты**:
+  - Пользователь: "через 2 дня".
+  - Бот: "I don't understand".
+  - Пользователь может ввести дату заново.
+
+**Сопоставление с UML и сценариями**:
+- **UML**: Переход `InputText → ChooseDate` реализован через `process_text` и `process_date`, что соответствует диаграмме состояний.
+- **Сценарий**: Шаги "Пользователь вводит текст" и "Пользователь вводит дату" выполнены, с возможностью отмены и обработки ошибок.
+
+---
+
 ## **4. Анализ соответствия ТЗ**
 **Соответствие ТЗ:**
 - **Язык программирования:** ТЗ предписывает использование Python. Реализация полностью выполнена на Python, что соответствует данному требованию.
